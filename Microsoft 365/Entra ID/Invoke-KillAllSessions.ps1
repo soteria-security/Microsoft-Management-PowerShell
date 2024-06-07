@@ -10,5 +10,5 @@ Connect-MgGraph -ContextScope Process -Scopes "User.ReadWrite.All", "Directory.R
 $users = (Invoke-GraphRequest -Method GET -Uri "https://graph.microsoft.com/beta/users").UserPrincipalName
 
 Foreach ($user in $users) {
-    Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/users/$user/revokeSIgnInSessions"
+    Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/users/$user/microsoft.graph.revokeSignInSessions"
 }

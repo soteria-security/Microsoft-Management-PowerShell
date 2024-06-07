@@ -41,4 +41,4 @@ ElseIf ($lookupType -eq 'DisplayName') {
     $user = (Get-MgUser -Filter "displayName eq '$targetUser'").UserPrincipalName
 }
 
-Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/users/$user/revokeSIgnInSessions"
+Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/users/$user/microsoft.graph.revokeSignInSessions"
