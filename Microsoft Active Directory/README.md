@@ -1,4 +1,4 @@
-# Microsoft Entra
+# Microsoft Active Directory
 
 # Purpose
 Scripts provided are intended to assist administrators in auditing and managing their Microsoft Active Directory environment.

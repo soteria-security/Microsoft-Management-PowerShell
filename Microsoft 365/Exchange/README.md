@@ -1,4 +1,4 @@
-# Microsoft Entra
+# Microsoft Exchange Online
 
 # Purpose
 Scripts provided are intended to assist administrators in auditing and managing their Microsoft Exchange Online environment.

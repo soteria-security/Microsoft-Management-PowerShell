@@ -1,4 +1,4 @@
-# Microsoft Entra
+# Microsoft Azure
 
 # Purpose
 Scripts provided are intended to assist administrators in auditing and managing their Microsoft Azure environment.
