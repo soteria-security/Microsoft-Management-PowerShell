@@ -46,7 +46,7 @@ function Show-Menu {
 
 $global:servicePrincipals = @()
 
-Connect-MgGraph -ContextScope Process -Scopes "Application.ReadWrite.All","Directory.ReadWrite.All","GroupMember.Read.All","RoleManagement.Read.Directory"
+Connect-MgGraph -ContextScope Process -Scopes "Application.ReadWrite.All","AppRoleAssignment.ReadWrite.All","Directory.ReadWrite.All","GroupMember.Read.All","RoleManagement.Read.Directory"
 
 Function Confirm-Applications {
     #Define the applications to restrict
