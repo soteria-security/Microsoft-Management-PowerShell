@@ -12,64 +12,64 @@
 .FUNCTIONALITY
     Connect to Exchange Online, enter email address or domain, automate block and Content Search to remove emails from the specified sender
 .Example
-    ./Exchange-SeekandDestroy.ps1 -AdminAccount myadmin@mydomain.com -Sender badguy@maliciousdomain.com -DeleteType Hard
+    ./Exchange-SeekandDestroy.ps1 -AdminAccount myadmin@mydomain.com -BySender -DeleteType Hard
+
+.Example
+    ./Exchange-SeekandDestroy.ps1 -AdminAccount myadmin@mydomain.com -BySubject -DeleteType Hard
 #>
 
-
 param (
-	[Parameter(Mandatory = $true,
-		HelpMessage = 'Admin or Auditor Username')]
-	[string] $AdminAccount,
-	[Parameter(Mandatory = $true,
-		HelpMessage = 'Email Address or Domain to Block')]
-	[string] $Sender,
     [Parameter(Mandatory = $true,
-		HelpMessage = 'Delete Type for Discovered Messages')]
-        [ValidateSet('Hard', 'Soft',
-		IgnoreCase = $true)]
-	[string] $DeleteType
+        HelpMessage = 'Admin or Auditor Username')]
+    [string] $AdminAccount,
+    [Parameter(Mandatory = $false,
+        HelpMessage = 'Search by Sender')]
+    [switch] $BySender,
+    [Parameter(Mandatory = $false,
+        HelpMessage = 'Search by Subject')]
+    [switch] $BySubject,
+    [Parameter(Mandatory = $true,
+        HelpMessage = 'Delete Type for Discovered Messages')]
+    [ValidateSet('Hard', 'Soft',
+        IgnoreCase = $true)]
+    [string] $DeleteType
 )
-
 
 #Get the date in desired format
 $global:date = Get-Date -f dd-MM-yyyy
 
-
 #Define the content search name
-$global:searchName = "$($sender)_Search_$($global:date)"
+$global:searchName = ""
 
-
-Function Confirm-Close{
+Function Confirm-Close {
     Read-Host "Press Enter to Exit"
     Exit
 }
 
-
-Function Colorize($ForeGroundColor){
+Function Colorize($ForeGroundColor) {
     $color = $Host.UI.RawUI.ForegroundColor
     $Host.UI.RawUI.ForegroundColor = $ForeGroundColor
   
-    if ($args){
-      Write-Output $args
+    if ($args) {
+        Write-Output $args
     }
   
     $Host.UI.RawUI.ForegroundColor = $color
-  }
-
-
-  Function Connect-Service {
-    Connect-ExchangeOnline -UserPrincipalName $AdminAccount
 }
 
+Function Connect-Service {
+    Connect-ExchangeOnline -UserPrincipalName $AdminAccount
+    Connect-IPPSSession -UserPrincipalName $AdminAccount
+}
 
-  Function Confirm-InstalledModules{
+Function Confirm-InstalledModules {
     #Check for required Modules and prompt for install if missing
     $modules = @("ExchangeOnlineManagement")
     $count = 0
     $installed = Get-InstalledModule | Select-Object Name
 
-    foreach ($module in $modules){
-        if ($installed.Name -notcontains $module){
+    foreach ($module in $modules) {
+        if ($installed.Name -notcontains $module) {
             $message = Write-Output "`n$module is not installed."
             $message1 = Write-Output "The module may be installed by running 'Install-Module $module -Force -Scope CurrentUser -Confirm:$false' in an elevated PowerShell window."
             Colorize Red ($message)
@@ -86,7 +86,7 @@ Function Colorize($ForeGroundColor){
         }
     }
 
-    If ($count -lt 1){
+    If ($count -lt 1) {
         Write-Output ""
         Write-Output ""
         $message = Write-Output "Dependency checks failed. Please install all missing modules before running this script."
@@ -99,11 +99,9 @@ Function Colorize($ForeGroundColor){
 
 }
 
-
 Confirm-InstalledModules
 
-
-Function Add-BlockedSender{
+Function Add-BlockedSender ($SendingUser) {
     #Check the size of the Tenant block list
     $listSender = Get-TenantAllowBlockListItems -ListType Sender -Block
 
@@ -114,33 +112,29 @@ Function Add-BlockedSender{
 
         #Let the user know what's happening
         Write-Output "Microsoft limits the total number of entries in the Tenant block lists to 1,000 entries. You have $($sum) remaining."
-        Write-Output "Adding $($Sender) to the Tenant Block list."
+        Write-Output "Adding $($SendingUser) to the Tenant Block list."
 
         #Do the things
-        New-TenantAllowBlockListItems -ListType Sender -Block -Entries $Sender -NoExpiration -Notes "Added to block list on $($global:date) by $($AdminAccount)."
+        New-TenantAllowBlockListItems -ListType Sender -Block -Entries $SendingUser -NoExpiration -Notes "Added to block list on $($global:date) by $($AdminAccount)."
     }
     Else {
 
         #Let the user know what's happening
         Write-Output "Tenant list maximum size exceeded. Blocking via user's mailboxes instead."
-        Write-Output "Adding $($Sender) to all mailboxes Block list."
+        Write-Output "Adding $($SendingUser) to all mailboxes Block list."
         
-        Get-Mailbox -ResultSize Unliimited | Set-MailboxJunkEmailConfiguration -BlockedSendersandDomains @{Add=$Sender}
+        Get-Mailbox -ResultSize Unliimited | Set-MailboxJunkEmailConfiguration -BlockedSendersandDomains @{Add = $SendingUser }
     }
 
     Connect-IPPSSession -UserPrincipalName $AdminAccount
 }
 
-
-Add-BlockedSender
-
-
-Function New-Search {
+Function New-Search ($selection) {
     #Update the user
     Write-Output "Creating the content search"
 
     #Create the content search
-    New-ComplianceSearch -Name $global:searchName -ExchangeLocation all -ContentMatchQuery "From:$sender"
+    New-ComplianceSearch -Name $global:searchName -ExchangeLocation all -AllowNotFoundExchangeLocationsEnabled $true -ContentMatchQuery $selection -Confirm:$false
 
     #Update the user
     Write-Output "Beginning the search."
@@ -149,22 +143,59 @@ Function New-Search {
     Start-ComplianceSearch $global:searchName
 }
 
+Function Invoke-BySender {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true,
+            HelpMessage = 'Email Address or Domain to Block')]
+        [string] $SendingUser
+    )
 
-New-Search
+    #Define the content search name
+    $global:searchName = "$($SendingUser)_Search_$($global:date)"
 
+    Add-BlockedSender -SendingUser $SendingUser
 
-Function Start-Cleanup{
+    New-Search -selection "From:$SendingUser"
+}
+
+Function Invoke-BySubject {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true,
+            HelpMessage = 'Email Address or Domain to Block')]
+        [string] $subject
+    )
+
+    #Define the content search name
+    $global:searchName = "$($subject)_Search_$($global:date)"
+
+    New-Search -selection "Subject:$subject"
+}
+
+If ($BySender.IsPresent) {
+    Invoke-BySender
+}
+ElseIf ($BySubject.IsPresent) {
+    Invoke-BySubject
+}
+Else {
+    Invoke-BySender
+}
+
+Function Start-Cleanup {
     #Export the results for documentation purposes
     New-ComplianceSearchAction $global:searchName -Preview
 
     #Update the user
     Write-Output "Exporting the results of the search for review. Please check this directory for a file named $($global:searchName)_Report.txt"
     
-    Get-ComplianceSearchAction "$($global:searchName)_Preview" | Select-Object -ExpandProperty Results | Out-File "$($global:searchName)_Report.txt"
+    (Get-ComplianceSearchAction "$($global:searchName)_Preview").Results | Out-File "$($global:searchName)_Report.txt"
 
-    New-ComplianceSearchAction -SearchName $global:searchName -Purge -PurgeType $DeleteType -Force -Confirm:$false
+    New-ComplianceSearchAction -SearchName "$($global:searchName)" -Purge -PurgeType $DeleteType -Force -Confirm:$false
+    
+    Get-ComplianceSearchAction "$($global:searchName)_Purge"
 }
-
 
 Function Get-SearchStatus {
     $search = Get-ComplianceSearch $global:searchName

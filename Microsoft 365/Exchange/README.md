@@ -14,7 +14,10 @@ Scripts provided are intended to assist administrators in auditing and managing 
 - Exchange-SeekandDestroy:  Connect to Exchange Online, enter email address or domain, automate block and Content Search to remove emails from the specified sender. Requires an authenticated Microsoft Exchange Online PowerShell session with sufficient permissions.
 
 ```
-./Exchange-SeekandDestroy.ps1 -AdminAccount myadmin@mydomain.com -Sender badguy@maliciousdomain.com -DeleteType Hard
+./Exchange-SeekandDestroy.ps1 -AdminAccount myadmin@mydomain.com -BySender -DeleteType Hard
+```
+```
+./Exchange-SeekandDestroy.ps1 -AdminAccount myadmin@mydomain.com -BySubject -DeleteType Hard
 ```
 - Get-ActiveSyncMailboxes: Audit Exchange mailboxes with ActiveSync enabled. Requires an already authenticated Microsoft Exchange Online PowerShell session with sufficient permissions.
 
