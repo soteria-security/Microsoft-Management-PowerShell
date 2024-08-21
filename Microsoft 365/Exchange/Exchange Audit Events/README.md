@@ -5,7 +5,7 @@ Scripts provided are intended to assist administrators in auditing and managing 
 
 
 # Scripts
-- Enumerate-PrivilegedGroups: Creates a new user account in the Entra ID environment and sets the Exchange Audit Log Event Types to capture for the account. Supplements the blog [Better Visibility — New Standard Logs in Microsoft Purview Audit](https://blog.soteria.io/better-visibility-new-standard-logs-in-microsoft-purview-audit-16ec7d000bab). Creates an authenticated Microsoft Exchange Online and Microsoft Graph session with "User.ReadWrite.All", "Directory.ReadWrite.All", "GroupMember.ReadWrite.All", "Group.ReadWrite.All", and "Directory.AccessAsUser.All" Microsoft Graph Scopes.
+- Account_Provisioning: Creates a new user account in the Entra ID environment and sets the Exchange Audit Log Event Types to capture for the account. Supplements the blog [Better Visibility — New Standard Logs in Microsoft Purview Audit](https://blog.soteria.io/better-visibility-new-standard-logs-in-microsoft-purview-audit-16ec7d000bab). Creates an authenticated Microsoft Exchange Online and Microsoft Graph session with "User.ReadWrite.All", "Directory.ReadWrite.All", "GroupMember.ReadWrite.All", "Group.ReadWrite.All", and "Directory.AccessAsUser.All" Microsoft Graph Scopes.
 
    ```
   # Example Execution:
