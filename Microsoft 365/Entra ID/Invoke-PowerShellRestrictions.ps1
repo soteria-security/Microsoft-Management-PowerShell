@@ -56,7 +56,8 @@ Function Confirm-Applications {
         "1950a258-227b-4e31-a9cf-717495945fc2", # Microsoft Azure PowerShell (Az PowerShell Module)
         "00000003-0000-0000-c000-000000000000", # Microsoft Graph
         "de8bc8b5-d9f9-48b1-a8ad-b748da725064", # Graph Explorer
-        "14d82eec-204b-4c2f-b7e8-296a70dab67e" # Microsoft Graph PowerShell
+        "14d82eec-204b-4c2f-b7e8-296a70dab67e", # Microsoft Graph PowerShell
+        "fb78d390-0c51-40cd-8e17-fdbfab77341b" # Exchange PowerShell
     )
 
     Foreach ($appId in $appIds) {
