@@ -22,3 +22,8 @@ Scripts provided are intended to assist administrators in auditing and managing 
   ```
   Connect-MgGraph -ContextScope Process -Scopes "Directory.ReadWrite.All", "AppRoleAssignment.ReadWrite.All", "Application.ReadWrite.All", "GroupMember.Read.All", "RoleManagement.Read.Directory"
   ```
+- Remediate-DangerousDefaults: Restrict default guest and user permissions that allow self-service account creation, guest invitations, application consents, application creation, and more. Create Conditional Access Policy to restrict Microsoft Admin Portals. It is recommended to review and modify the options of the script to meet organizational needs. Requires an already authenticated Microsoft Graph session with "Directory.Read.All", "Policy.ReadWrite.Authorization", and "Policy.ReadWrite.ConditionalAccess" Microsoft Graph Scopes.
+
+  ```
+  Connect-MgGraph -ContextScope Process -Scopes "Directory.ReadWrite.All", "Policy.ReadWrite.Authorization", "Policy.ReadWrite.ConditionalAccess"
+  ```
