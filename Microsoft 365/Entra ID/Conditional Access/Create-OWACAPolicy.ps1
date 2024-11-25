@@ -1,116 +1,65 @@
-Function Create-OWACAPolicy {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $true)]
-        [array]
-        $GroupName,
-        [Parameter(Mandatory = $false)]
-        [switch]
-        $Block
-    )
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory = $true)]
+    [array]
+    $GroupNames
+)
 
-    [array]$groups = $GroupName
+[array]$groups = $GroupNames
 
-    $groupIds = @()
+$groupIds = @()
 
-    ForEach ($group in $groups) {
-        $groupId = (Invoke-GraphRequest -Method Get -Uri "https://graph.microsoft.com/beta/groups?filter=startswith(displayName,+'$group')").Value
-        $groupId = "{\n}"
-    }
+ForEach ($group in $groups) {
+    $groupId = (Invoke-GraphRequest -Method Get -Uri "https://graph.microsoft.com/beta/groups?filter=startswith(displayName,+'$group')").Value
+    $groupIds += $groupId.id
+}
 
-    <#
+$action = 'Block'
+$grantPolicy = 'block'
+$isBlockPolicy = 'exclude'
+
+$bodyContent = @"
     {
         "displayName": "$action OWA Policy",
         "state": "enabledForReportingButNotEnforced",
-        "sessionControls": {
-            "disableResilienceDefaults": null,
-            "cloudAppSecurity": null,
-            "persistentBrowser": null,
-            "applicationEnforcedRestrictions": {
-                "isEnabled": true
-            },
-            "signInFrequency": {
-                "authenticationType": "primaryAndSecondaryAuthentication",
-                "frequencyInterval": "timeBased",
-                "value": 4,
-                "isEnabled": true,
-                "type": "hours"
-            }
-        },
         "conditions": {
             "devices": {
                 "deviceFilter": {
-                "mode": "exclude",
-                "rule": "device.deviceOwnership -eq \"Company\" -or device.isCompliant -eq True"
+                    "mode": "exclude",
+                    "rule": "device.deviceOwnership -eq \"Company\" -or device.isCompliant -eq True"
                 }
             },
             "clientAppTypes": [
                 "browser"
             ],
             "users": {
-                "includeGroups": [
-                    "6c96716b-b32b-40b8-9009-49748bb6fcd5"
-                ],
-                "excludeGroups": [
-                    "f753047e-de31-4c74-a6fb-c38589047723"
+                "includeUsers": ["All"],
+                "$($isBlockPolicy)Groups": [
+                    "$($groupIds -join ",\n")"
                 ]
             },
             "applications": {
                 "includeApplications": [
                     "00000002-0000-0ff1-ce00-000000000000"
+                ]
+            },
+            "locations": {
+                "includeLocations": [
+                    "All"
+                ],
+                "excludeLocations": [
+                    "AllTrusted"
                 ]
             }
         },
         "grantControls": {
             "operator": "OR",
-            "builtInControls": [
-                "mfa"
-            ]
-        }
-    }
-    #>
-
-    If ($block.IsPresent) {
-        $action = 'Block'
-        $grantPolicy = 'block'
-        $isBlockPolicy = 'exclude'
-    }
-
-    $body = @{
-        displayName   = "$action OWA Policy"
-        state         = "enabledForReportingButNotEnforced"
-        conditions    = @"
-            {
-            "devices": {
-                "deviceFilter": {
-                "mode": "exclude",
-                "rule": "device.deviceOwnership -eq \"Company\" -or device.isCompliant -eq True"
-                }
-            },
-            "clientAppTypes": [
-                "browser"
-            ],
-            "users": {
-                "$($isBlockPolicy)Groups": [
-                    $($groupIds -join ",\n")
-                ]
-            },
-            "applications": {
-                "includeApplications": [
-                    "00000002-0000-0ff1-ce00-000000000000"
-                ]
-            }
-        }
-"@
-        grantControls = @{
-            operator        = "OR"
-            builtInControls = @"
+            "builtInControls":
             [
                 "$grantPolicy"
             ]
-"@
         }
-    }
-
-    Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies" -Body $bodyContent -ContentType 'application/json'
 }
+"@
+
+Invoke-GraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies" -Body $bodyContent -ContentType 'application/json'
