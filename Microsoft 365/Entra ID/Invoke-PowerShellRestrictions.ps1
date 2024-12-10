@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
-    Restrict Azure AD, PnP SharePoint, Microsoft Intune, Microsoft Azure, and Microsoft Graph PowerShell Modules to Explicilty Assigned Users
+    Restrict Azure AD, Microsoft Intune, Microsoft Azure, and Microsoft Graph PowerShell Modules, and More to Explicitly Assigned Users
 .DESCRIPTION
-    Restrict Azure AD, PnP SharePoint, Microsoft Intune, Microsoft Azure, and Microsoft Graph PowerShell Modules to Explicilty Assigned Users
+    Restrict Azure AD, Microsoft Intune, Microsoft Azure, and Microsoft Graph PowerShell Modules, and More to Explicitly Assigned Users
 .INPUTS
     Directory Role, File Path, or Individual User
 .COMPONENT
@@ -10,7 +10,7 @@
 .ROLE
     Sufficient rights in Azure AD
 .FUNCTIONALITY
-    Restrict Azure AD, PnP SharePoint, Microsoft Intune, Microsoft Azure, and Microsoft Graph PowerShell Modules to Explicilty Assigned Users
+    Restrict Azure AD, Microsoft Intune, Microsoft Azure, and Microsoft Graph PowerShell Modules, and More to Explicitly Assigned Users
 #>
 
 
@@ -41,6 +41,7 @@ function Show-Menu {
     Write-Host "Press '2' to choose an Azure Active Directory/Entra ID Security Group."
     Write-Host "Press '3' to provide a csv file with a list of admins by UserPrincipalName."
     Write-Host "Press '4' to provide an individual user by email."
+    Write-Host "Press 'M' to list all target modules."
     Write-Host "Press 'Q' to quit."
 }
 
@@ -51,13 +52,11 @@ Function Confirm-Applications {
     $appIds = @(
         "d1ddf0e4-d672-4dae-b554-9d5bdfd93547", # Microsoft Intune PowerShell
         "1b730954-1685-4b74-9bfd-dac224a7b894", # Azure Active Directory PowerShell
-        "00000002-0000-0000-c000-000000000000", # Windows Azure Active Directory
-        "797f4846-ba00-4fd7-ba43-dac1f8f63013", # Windows Azure Service Management API
         "1950a258-227b-4e31-a9cf-717495945fc2", # Microsoft Azure PowerShell (Az PowerShell Module)
-        "00000003-0000-0000-c000-000000000000", # Microsoft Graph
         "de8bc8b5-d9f9-48b1-a8ad-b748da725064", # Graph Explorer
         "14d82eec-204b-4c2f-b7e8-296a70dab67e", # Microsoft Graph PowerShell
-        "fb78d390-0c51-40cd-8e17-fdbfab77341b" # Exchange PowerShell
+        "fb78d390-0c51-40cd-8e17-fdbfab77341b", # Exchange PowerShell
+        "23d8f6bd-1eb0-4cc2-a08c-7bf525c67bcd" # Power BI PowerShell
     )
 
     Foreach ($appId in $appIds) {
@@ -228,6 +227,16 @@ Function Confirm-StandAloneAdmin {
     }
 }
 
+Function List-TargetModules {
+    Write-Host "Microsoft Intune PowerShell" -ForegroundColor Yellow
+    Write-Host "Azure Active Directory PowerShell" -ForegroundColor Yellow
+    Write-Host "Microsoft Azure PowerShell (Az PowerShell Module)" -ForegroundColor Yellow
+    Write-Host "Graph Explorer" -ForegroundColor Yellow
+    Write-Host "Microsoft Graph PowerShell" -ForegroundColor Yellow
+    Write-Host "Exchange PowerShell" -ForegroundColor Yellow
+    Write-Host "Power BI PowerShell" -ForegroundColor Yellow
+}
+
 
 do {
     Show-Menu
@@ -236,18 +245,23 @@ do {
     
     switch ($selection) {
         '1' {
-            'Restricting Azure AD, PnP SharePoint, Microsoft Intune, Microsoft Azure, and Microsoft Graph PowerShell Modules to a Directory Role'
+            'Restricting All Target Modules to a Directory Role'
             Confirm-DirRole
         } '2' {
-            'Restricting Azure AD, PnP SharePoint, Microsoft Intune, Microsoft Azure, and Microsoft Graph PowerShell Modules to a Security Group'
+            'Restricting All Target Modules to a Security Group'
             Confirm-GroupMembers
         } '3' {
-            'Restricting Azure AD, PnP SharePoint, Microsoft Intune, Microsoft Azure, and Microsoft Graph PowerShell Modules to a list of admins'
+            'Restricting All Target Modules to a list of admins'
             Confirm-ListAdmins
         } '4' {
-            'Adding the specified user to Azure AD, PnP SharePoint, Microsoft Intune, Microsoft Azure, and Microsoft Graph PowerShell Modules'
+            'Adding the specified user to All Target Modules'
             Confirm-StandAloneAdmin
-        } 
+        } 'M' {
+            'Listing all target Modules'
+            List-TargetModules
+        } 'Q' {
+            Break
+        }
     }
     pause
 }
