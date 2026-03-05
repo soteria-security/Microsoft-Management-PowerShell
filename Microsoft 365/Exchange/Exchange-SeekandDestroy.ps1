@@ -59,7 +59,7 @@ Function Colorize($ForeGroundColor) {
 
 Function Connect-Service {
     Connect-ExchangeOnline -UserPrincipalName $AdminAccount
-    Connect-IPPSSession -UserPrincipalName $AdminAccount
+    Connect-IPPSSession -UserPrincipalName $AdminAccount -EnableSearchOnlySession
 }
 
 Function Confirm-InstalledModules {
