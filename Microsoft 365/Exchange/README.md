@@ -29,3 +29,15 @@ Scripts provided are intended to assist administrators in auditing and managing 
 ```
 ./Get-MailDomainsStatus.ps1 -Domains domain1,domain2,domain3
 ```
+
+- Invoke-BlockSharedMailboxSignIn: Block interactive login to shared mailboxes
+
+```
+./Invoke-BlockSharedMailboxSignIn.ps1
+```
+
+- Remove-CalendarAutoMappingSharedMailbox: Disable Auto-mapping of shared mailbox calendars
+
+```
+./Remove-CalendarAutoMappingSharedMailbox.ps1
+```

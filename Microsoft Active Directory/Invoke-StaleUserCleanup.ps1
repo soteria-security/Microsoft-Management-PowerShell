@@ -30,7 +30,7 @@ Write-Host "$($stale_accounts.count) stale accounts were found. $($serviceAccts.
 
 If (! $reportOnly.IsPresent) {
     Foreach ($account in $toDisable) {
-        Write-Host "Disabling $account with description Disabled by $admin on $day."
+        Write-Host "Disabling $account with description `'Disabled by $admin on $day`'."
         Disable-ADAccount -identity $account
         Set-ADUser $account -Description "Disabled by $admin on $day"
     }
