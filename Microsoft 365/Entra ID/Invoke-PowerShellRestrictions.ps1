@@ -57,6 +57,14 @@
       - HTTP 409 conflict on appRoleAssignedTo is now caught via status code rather than
         error message text.
       - $script:servicePrincipals is reset on every Confirm-Applications call.
+      - Pre-flight now validates Get-MgContext scopes against the required scope set and
+        emits a precise "missing X, Y, Z" message instead of probing /me (which only
+        needs User.Read and let unscoped sessions sail past into a wall of 403s).
+      - Runtime catch blocks now branch on HTTP status code via Get-GraphErrorStatusCode:
+        403 surfaces as a permissions/role message (not "likely retired/blocked"), and
+        400/404 retains the retired-app interpretation. Misclassifying 403s as
+        retired-app errors was actively misleading and sent users debugging the wrong
+        problem.
 #>
 
 
@@ -107,6 +115,121 @@ $script:targetApps = @(
 )
 
 $script:servicePrincipals = @()
+
+# Scopes the script actually needs at runtime. Validated against the live MgGraph
+# session by Test-RequiredGraphScopes before any privileged work begins.
+$script:requiredScopes = @(
+    'Application.ReadWrite.All'
+    'Directory.ReadWrite.All'
+    'AppRoleAssignment.ReadWrite.All'
+    'User.Read.All'
+    'Group.Read.All'
+    'RoleManagement.Read.Directory'
+)
+
+
+Function Get-GraphErrorStatusCode {
+    <#
+        Extract an HTTP status code from a Graph error record. Invoke-GraphRequest does
+        not reliably populate -StatusCodeVariable on a throw, and the exception type
+        varies between PS editions, so we try .Response.StatusCode first and fall back
+        to parsing the canonical .NET "Response status code does not indicate success: X"
+        message. Returns 0 when the code can't be determined.
+    #>
+    param([Parameter(Mandatory)]$ErrorRecord)
+
+    if ($ErrorRecord.Exception.Response) {
+        try { return [int]$ErrorRecord.Exception.Response.StatusCode } catch { }
+    }
+
+    $msg = "$($ErrorRecord.Exception.Message)"
+    switch -Regex ($msg) {
+        '\bForbidden\b' { return 403 }
+        '\bUnauthorized\b' { return 401 }
+        '\bNotFound\b' { return 404 }
+        '\bBadRequest\b' { return 400 }
+        '\bConflict\b' { return 409 }
+        'already exists' { return 409 }
+        'EntitlementGrant' { return 409 }
+        '\bTooManyRequests\b' { return 429 }
+    }
+    return 0
+}
+
+
+Function Write-ConnectInstructions {
+    <#
+        Print the exact reconnect command and the directory roles the signed-in account
+        must hold. Called both from the pre-flight check and (potentially) any runtime
+        403 so the user sees the same fix recipe wherever the failure shows up.
+    #>
+    param([string[]]$MissingScopes)
+
+    Write-Host ""
+    Write-Host "How to fix:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  1) Reconnect to Microsoft Graph with the full required scope set:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "       Disconnect-MgGraph -ErrorAction SilentlyContinue" -ForegroundColor Yellow
+    Write-Host "       Connect-MgGraph -Scopes ``" -ForegroundColor Yellow
+    Write-Host "           Application.ReadWrite.All, Directory.ReadWrite.All, ``" -ForegroundColor Yellow
+    Write-Host "           AppRoleAssignment.ReadWrite.All, User.Read.All, ``" -ForegroundColor Yellow
+    Write-Host "           Group.Read.All, RoleManagement.Read.Directory" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  2) The signed-in account must hold one of the following directory roles:" -ForegroundColor Yellow
+    Write-Host "       - Application Administrator" -ForegroundColor Yellow
+    Write-Host "       - Cloud Application Administrator" -ForegroundColor Yellow
+    Write-Host "       - Global Administrator" -ForegroundColor Yellow
+    Write-Host "     (Scopes alone are not enough — Graph also enforces the RBAC role.)" -ForegroundColor Yellow
+
+    if ($MissingScopes -and $MissingScopes.Count -gt 0) {
+        Write-Host ""
+        Write-Host "Scopes missing from the current session:" -ForegroundColor Red
+        foreach ($s in $MissingScopes) {
+            Write-Host "  - $s" -ForegroundColor Red
+        }
+    }
+    Write-Host ""
+}
+
+
+Function Test-RequiredGraphScopes {
+    <#
+        Pre-flight check. Returns an object describing connection state and any missing
+        scopes before the first privileged Graph call. Replaces the original /me probe..
+    #>
+    $context = $null
+    Try {
+        $context = Get-MgContext
+    }
+    Catch {
+        return [pscustomobject]@{
+            Connected     = $false
+            MissingScopes = $script:requiredScopes
+            Account       = $null
+            TenantId      = $null
+        }
+    }
+
+    if (-not $context) {
+        return [pscustomobject]@{
+            Connected     = $false
+            MissingScopes = $script:requiredScopes
+            Account       = $null
+            TenantId      = $null
+        }
+    }
+
+    $currentScopes = @($context.Scopes)
+    $missing = @($script:requiredScopes | Where-Object { $_ -notin $currentScopes })
+
+    return [pscustomobject]@{
+        Connected     = $true
+        MissingScopes = $missing
+        Account       = $context.Account
+        TenantId      = $context.TenantId
+    }
+}
 
 
 Function Get-ServicePrincipalByAppId {
@@ -195,10 +318,24 @@ Function Confirm-Applications {
                 Write-Host "[$friendlyName] Created service principal with appRoleAssignmentRequired=true." -ForegroundColor Green
             }
             Catch {
-                # Common failure here: the first-party app has been retired or otherwise
-                # blocked by Microsoft from new SP provisioning (e.g. AzureAD PowerShell post-Oct 2025). 
-                # We log and skip rather than failing the entire run.
-                Write-Warning "[$friendlyName] Could not create service principal (likely retired or blocked first-party app): $($_.Exception.Message). Skipping."
+                # Branch on the actual HTTP status. 403 is a permissions/role problem,
+                # not an app-retirement problem — the original blanket "retired/blocked"
+                # message sent users debugging the wrong thing. 400/404 stays as the
+                # retired-app interpretation (Microsoft returns these for first-party
+                # apps that can no longer be instantiated, e.g. AzureAD PowerShell).
+                $code = Get-GraphErrorStatusCode -ErrorRecord $_
+                $errMsg = $_.Exception.Message
+
+                if ($code -eq 403) {
+                    Write-Warning "[$friendlyName] Forbidden (403) creating service principal. The current session lacks Application.ReadWrite.All, or the signed-in account is not in Application Administrator / Cloud Application Administrator / Global Administrator. Skipping."
+                }
+                elseif ($code -in 400, 404) {
+                    Write-Warning "[$friendlyName] Could not create service principal (likely retired or blocked first-party app, HTTP $($code)): $($errMsg). Skipping."
+                }
+                else {
+                    $codeText = if ($code) { "HTTP $code" } else { 'unknown status' }
+                    Write-Warning "[$friendlyName] Failed to create service principal ($($codeText)): $($errMsg). Skipping."
+                }
                 continue
             }
         }
@@ -214,7 +351,16 @@ Function Confirm-Applications {
                 }
             }
             Catch {
-                Write-Warning "[$friendlyName] Could not enforce appRoleAssignmentRequired on existing SP: $($_.Exception.Message). Skipping."
+                $code = Get-GraphErrorStatusCode -ErrorRecord $_
+                $errMsg = $_.Exception.Message
+
+                if ($code -eq 403) {
+                    Write-Warning "[$friendlyName] Forbidden (403) enforcing appRoleAssignmentRequired on existing SP. The current session lacks Application.ReadWrite.All, or the signed-in account is not in Application Administrator / Cloud Application Administrator / Global Administrator. Skipping."
+                }
+                else {
+                    $codeText = if ($code) { "HTTP $code" } else { 'unknown status' }
+                    Write-Warning "[$friendlyName] Could not enforce appRoleAssignmentRequired on existing SP ($($codeText)): $($errMsg). Skipping."
+                }
                 continue
             }
         }
@@ -258,15 +404,21 @@ Function Add-AdminAssignment {
             -ErrorAction Stop | Out-Null
     }
     Catch {
-        # Invoke-GraphRequest throws on non-2xx regardless of -ErrorAction (known issue).
-        # Detect "already assigned" by inspecting the inner exception, since the cmdlet
-        # does not always populate -StatusCodeVariable on the thrown response.
+        # Invoke-GraphRequest throws on non-2xx regardless of -ErrorAction (known issue),
+        # and does not always populate -StatusCodeVariable on the thrown response, so we
+        # route through Get-GraphErrorStatusCode for consistent classification.
+        $code = Get-GraphErrorStatusCode -ErrorRecord $_
         $errMsg = $_.Exception.Message
-        if ($errMsg -match '\b409\b' -or $errMsg -match 'already exists' -or $errMsg -match 'EntitlementGrant') {
+
+        if ($code -eq 409) {
             Write-Host "$principalDisplay already assigned to $spDisplay" -ForegroundColor Yellow
         }
+        elseif ($code -eq 403) {
+            Write-Warning "Forbidden (403) assigning $($principalDisplay) to $($spDisplay). Session lacks AppRoleAssignment.ReadWrite.All, or the signed-in account is not in a role that can grant app role assignments."
+        }
         else {
-            Write-Warning "Failed to add $principalDisplay to $spDisplay`: $errMsg"
+            $codeText = if ($code) { "HTTP $code" } else { 'unknown status' }
+            Write-Warning "Failed to add $($principalDisplay) to $($spDisplay) ($($codeText)): $($errMsg)"
         }
     }
 }
@@ -438,21 +590,26 @@ Function List-TargetModules {
     Write-Host ""
 }
 
-$mgContext = $null
-Try {
-    $mgContext = Invoke-GraphRequest -Method Get -Uri 'https://graph.microsoft.com/v1.0/me' -ErrorAction Stop
-}
-Catch {
-    Write-Warning "Not connected to Microsoft Graph, or current session lacks User.Read."
-    Write-Host ""
-    Write-Host "Run the following before launching this script:" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "  Connect-MgGraph -Scopes Application.ReadWrite.All, Directory.ReadWrite.All, ``" -ForegroundColor Yellow
-    Write-Host "                          AppRoleAssignment.ReadWrite.All, User.Read.All, ``"        -ForegroundColor Yellow
-    Write-Host "                          Group.Read.All, RoleManagement.Read.Directory"            -ForegroundColor Yellow
-    Write-Host ""
+# Pre-flight: verify Graph connectivity AND that the session token actually carries
+# every scope this script needs. The previous /me probe only required User.Read, so
+# under-scoped sessions passed it and then 403d on every privileged call — leaving
+# the user staring at a wall of misleading "likely retired or blocked first-party app"
+# warnings. Failing fast here, with the specific missing scopes named, is the fix.
+$scopeCheck = Test-RequiredGraphScopes
+
+if (-not $scopeCheck.Connected) {
+    Write-Warning "Not connected to Microsoft Graph. Run Connect-MgGraph before launching this script."
+    Write-ConnectInstructions -MissingScopes $script:requiredScopes
     return
 }
+
+if ($scopeCheck.MissingScopes.Count -gt 0) {
+    Write-Warning "Connected to Microsoft Graph as $($scopeCheck.Account), but $($scopeCheck.MissingScopes.Count) required scope(s) are missing from this session. Service principal creation and hardening will return HTTP 403 until you reconnect with the full scope set."
+    Write-ConnectInstructions -MissingScopes $scopeCheck.MissingScopes
+    return
+}
+
+Write-Host "Connected as $($scopeCheck.Account) (tenant $($scopeCheck.TenantId)) with all required scopes." -ForegroundColor Green
 
 
 do {

@@ -3,7 +3,7 @@ param (
     [Parameter(Mandatory = $true)]
     [Int32]
     $range,
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [switch]
     $reportOnly
 )
