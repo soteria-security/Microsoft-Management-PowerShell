@@ -38,7 +38,18 @@
         default target list. Module retired by Microsoft starting mid-October 2025. Kept
         commented for reference; uncomment to attempt hardening on tenants where the
         legacy SP object still exists.
-      - Added Microsoft Entra PowerShell AppId (replacement for AzureAD module).
+      - Microsoft Entra PowerShell (the Microsoft.Entra module) has NO distinct first-party
+        AppId. Its interactive Connect-Entra rides on the Microsoft Graph PowerShell SDK and
+        signs in as Microsoft Graph Command Line Tools (14d82eec-204b-4c2f-b7e8-296a70dab67e),
+        which is already in the target list -- so hardening that SP already restricts interactive
+        Entra PowerShell sign-in; there is no separate SP to add for it. (App-only Connect-Entra
+        uses a customer-registered app, which an all-first-party-app list cannot gate.) An earlier
+        refactor note claimed an "Entra PowerShell AppId" was added; that was incorrect -- no such
+        first-party AppId exists.
+      - Added SharePoint Online Management Shell (9bc3ab49-b65d-410a-85ad-de819febfddc) -- the
+        first-party app that interactive Connect-SPOService (Microsoft.Online.SharePoint.PowerShell)
+        signs in as. This is the Management Shell CLIENT, not Office 365 SharePoint Online
+        (00000003-0000-0ff1-ce00-000000000000, the workload itself -- which must never be hardened).
       - All Graph URLs now use backtick-escaped `$filter so the OData query parameter is
         actually honored (the previous `filter=` was silently ignored by Graph, which
         returned the first page of all SPs).
@@ -109,9 +120,10 @@ $script:targetApps = @(
     [pscustomobject]@{ AppId = '1950a258-227b-4e31-a9cf-717495945fc2'; Name = 'Microsoft Azure PowerShell (Az)' }
     [pscustomobject]@{ AppId = '04b07795-8ddb-461a-bbee-02f9e1bf7b46'; Name = 'Microsoft Azure CLI' }
     [pscustomobject]@{ AppId = 'de8bc8b5-d9f9-48b1-a8ad-b748da725064'; Name = 'Graph Explorer' }
-    [pscustomobject]@{ AppId = '14d82eec-204b-4c2f-b7e8-296a70dab67e'; Name = 'Microsoft Graph Command Line Tools' }
+    [pscustomobject]@{ AppId = '14d82eec-204b-4c2f-b7e8-296a70dab67e'; Name = 'Microsoft Graph Command Line Tools (also covers Microsoft Entra PowerShell)' }
     [pscustomobject]@{ AppId = 'fb78d390-0c51-40cd-8e17-fdbfab77341b'; Name = 'Microsoft Exchange REST API Based PowerShell' }
     [pscustomobject]@{ AppId = '23d8f6bd-1eb0-4cc2-a08c-7bf525c67bcd'; Name = 'Power BI PowerShell' }
+    [pscustomobject]@{ AppId = '9bc3ab49-b65d-410a-85ad-de819febfddc'; Name = 'SharePoint Online Management Shell' }
 )
 
 $script:servicePrincipals = @()

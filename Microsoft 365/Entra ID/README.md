@@ -102,15 +102,24 @@ Connect-MgGraph -ContextScope Process -Scopes `
 Restricts first-party Microsoft administrative PowerShell / CLI applications to explicitly assigned users by creating (if missing) and hardening their service principals so that `appRoleAssignmentRequired = true` and only assigned users hold the default app role. Target users can be supplied via a directory role, a security group, a CSV of UserPrincipalNames, or a single UPN.
 
 **Target applications hardened by default:**
-- Microsoft Intune PowerShell
-- Microsoft Azure PowerShell (Az)
-- Microsoft Azure CLI
-- Graph Explorer
-- Microsoft Graph Command Line Tools
-- Microsoft Exchange REST API Based PowerShell
-- Power BI PowerShell
+
+| Module / tool | First-party AppId |
+|---|---|
+| Microsoft Intune PowerShell | `d1ddf0e4-d672-4dae-b554-9d5bdfd93547` |
+| Microsoft Azure PowerShell (`Az`) | `1950a258-227b-4e31-a9cf-717495945fc2` |
+| Microsoft Azure CLI | `04b07795-8ddb-461a-bbee-02f9e1bf7b46` |
+| Graph Explorer | `de8bc8b5-d9f9-48b1-a8ad-b748da725064` |
+| Microsoft Graph Command Line Tools — also the sign-in app for **Microsoft Entra PowerShell** (`Microsoft.Entra`) | `14d82eec-204b-4c2f-b7e8-296a70dab67e` |
+| Microsoft Exchange REST API Based PowerShell | `fb78d390-0c51-40cd-8e17-fdbfab77341b` |
+| Power BI PowerShell | `23d8f6bd-1eb0-4cc2-a08c-7bf525c67bcd` |
+| SharePoint Online Management Shell (`Microsoft.Online.SharePoint.PowerShell`) | `9bc3ab49-b65d-410a-85ad-de819febfddc` |
 
 *(The Azure Active Directory PowerShell SP entry is commented out — that module was retired in October 2025 and Microsoft no longer allows new SP provisioning for that AppId.)*
+
+> **Notes on module coverage**
+> - **Microsoft Entra PowerShell** (`Microsoft.Entra`) has no first-party AppId of its own. Its interactive `Connect-Entra` rides on the Microsoft Graph PowerShell SDK and signs in as **Microsoft Graph Command Line Tools** (already listed above), so it is covered without a separate entry.
+> - The SharePoint row targets the **SharePoint Online Management Shell** *client* app — the app interactive `Connect-SPOService` signs in as. It is **not** the *Office 365 SharePoint Online* workload (`00000003-0000-0ff1-ce00-000000000000`), which must **never** be hardened (doing so would break SharePoint/OneDrive tenant-wide).
+> - This list gates **interactive / delegated** sign-in only. App-only authentication (`Connect-Entra`/`Connect-MgGraph`/`Connect-SPOService -ClientId <cert app>`) uses a **customer-registered** Entra app, which an all-first-party-app list cannot restrict.
 
 **Connect:**
 ```powershell
