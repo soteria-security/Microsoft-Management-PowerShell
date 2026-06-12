@@ -1,7 +1,7 @@
 param (
     [Parameter(Mandatory = $true,
         HelpMessage = 'Authenticated PowerShell Module')]
-    [ValidateSet('MSOL', 'Graph',
+    [ValidateSet('Graph',
         IgnoreCase = $false)]
     [string[]] $psModule,
     [Parameter(Mandatory = $true,
@@ -1232,50 +1232,6 @@ Function Find-AppLicensedUsers {
         'YAMMER_ENTERPRISE'                                                          = 'Yammer Enterprise';
         'YAMMER_ENTERPRISE_STANDALONE'                                               = 'Yammer Enterprise Standalone';
         'YAMMER_MIDSIZE'                                                             = 'Yammer Midsize'
-    }
-
-    If ($psModule -eq 'MSOL') {
-        $allUsers = Get-MsolUser -All | Where-Object { ($_.Licenses).Count -gt 0 }
-
-        Foreach ($user in $allUsers) {
-            $assignments = (Get-MsolUser -UserPrincipalName $user.UserPrincipalName).Licenses
-
-            $userInfo = [PSCustomObject]@{
-                Name                        = $user.UserPrincipalName
-                'License Assignment Method' = ""
-                Applications                = ""
-            }
-
-            If (($assignments.GroupsAssigningLicense | Measure-Object).Count -ge 1) {
-                $userInfo.'License Assignment Method' = 'Group'
-            }
-            Else {
-                $userInfo.'License Assignment Method' = 'Direct'
-            }
-
-            $svcStatus = (Get-MsolUser -UserPrincipalName $user.UserPrincipalName).Licenses.servicestatus
-            $spNames = ($svcStatus | Where-Object { $_.ProvisioningStatus -eq 'Success' }).serviceplan.servicename
-            
-            $serviceNames = @()
-
-            foreach ($serviceplan in $spNames) {
-                if ($serviceplan -MATCH $skuids.Name) {
-                    $serviceNames += $skuids.Get_Item($serviceplan)
-                }
-            }
-            
-            $userApps = @()
-
-            Foreach ($app in $Applications) {
-                If ($serviceNames -match $app) {
-                    $svcName = $serviceNames | Where-Object { $_ -match $app }
-                    $userApps += $svcName
-                }
-            }
-
-            $userInfo.Applications = ($userApps | Out-String).Trim()
-            $userInfo | Where-Object { $_.Applications -ne "" } | Export-Csv "UserLicenseReport.csv" -NoTypeInformation -Append
-        }
     }
 
     If ($psModule -eq 'Graph') {
