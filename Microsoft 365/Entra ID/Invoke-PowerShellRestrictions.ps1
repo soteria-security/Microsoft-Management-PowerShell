@@ -104,6 +104,8 @@ $script:targetApps = @(
     [pscustomobject]@{ AppId = '14d82eec-204b-4c2f-b7e8-296a70dab67e'; Name = 'Microsoft Graph Command Line Tools' }
     [pscustomobject]@{ AppId = 'fb78d390-0c51-40cd-8e17-fdbfab77341b'; Name = 'Microsoft Exchange REST API Based PowerShell' }
     [pscustomobject]@{ AppId = '23d8f6bd-1eb0-4cc2-a08c-7bf525c67bcd'; Name = 'Power BI PowerShell' }
+[pscustomobject]@{ AppId = '04f0c124-f2bc-4f59-8241-bf6df9866bbd'; Name = 'Visual Studio' }
+    [pscustomobject]@{ AppId = 'aebc6443-996d-45c2-90f0-388ff96faa56'; Name = 'VS Code' }
 )
 
 $script:servicePrincipals = @()
